@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Music Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Music Generator</h1>
+            <p>Generate unique music with MusicGen Small</p>
+        </header>
+
+        <div class="main-content">
+            <div class="info-panel">
+                <h2>About This Project</h2>
+                <p>
+                    This is an AI Music Generator powered by Meta's MusicGen Small model with 8-bit quantization.
+                </p>
+                <p>
+                    How to use:
+                </p>
+                <ol>
+                    <li>Enter a descriptive prompt for your desired music</li>
+                    <li>Select a musical genre and key</li>
+                    <li>Adjust the tempo and complexity</li>
+                    <li>Click "Generate Music" to create your composition</li>
+                    <li>Listen to and download your generated audio file</li>
+                </ol>
+                
+                <div class="tech-notes">
+                    <h3>Technical Notes</h3>
+                    <p>
+                        The system uses MusicGen Small with 8-bit quantization optimized for GPUs. 
+                        The model is downloaded from Hugging Face when first used.
+                    </p>
+                    <p>
+                        For best results:
+                    </p>
+                    <ul>
+                        <li>Use clear, descriptive prompts</li>
+                        <li>Start with lower complexity settings</li>
+                        <li>Try different musical genres</li>
+                        <li>Ensure you have a stable internet connection for initial model download</li>
+                        <li>The model is smaller and faster than MusicGen Medium</li>
+                    </ul>
+                </div>
+                
+                <div id="status-message" class="hidden">
+                    <!-- Status messages will be displayed here -->
+                </div>
+            </div>
+
+            <div class="display-panel">
+                <h2>Music Generation</h2>
+                <form id="generation-form">
+                    <div class="form-group">
+                        <label for="prompt">Music Prompt:</label>
+                        <textarea id="prompt" name="prompt" rows="3" placeholder="Describe the music you want to create (e.g., 'A peaceful piano melody with gentle strings')"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="genre">Genre:</label>
+                        <div class="select-wrapper">
+                            <select id="genre" name="genre">
+                                <option value="classical">Classical</option>
+                                <option value="jazz">Jazz</option>
+                                <option value="pop">Pop</option>
+                                <option value="rock">Rock</option>
+                                <option value="electronic">Electronic</option>
+                                <option value="ambient">Ambient</option>
+                                <option value="orchestral">Orchestral</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="key">Key:</label>
+                        <div class="select-wrapper">
+                            <select id="key" name="key">
+                                <option value="C">C</option>
+                                <option value="C#">C#</option>
+                                <option value="D">D</option>
+                                <option value="D#">D#</option>
+                                <option value="E">E</option>
+                                <option value="F">F</option>
+                                <option value="F#">F#</option>
+                                <option value="G">G</option>
+                                <option value="G#">G#</option>
+                                <option value="A">A</option>
+                                <option value="A#">A#</option>
+                                <option value="B">B</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tempo">Tempo:</label>
+                        <div class="range-with-value">
+                            <input type="range" id="tempo" name="tempo" min="60" max="180" value="120" class="slider">
+                            <div class="range-value">120 BPM</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="complexity">Complexity (affects duration):</label>
+                        <div class="range-with-value">
+                            <input type="range" id="complexity" name="complexity" min="1" max="10" value="5" class="slider">
+                            <div class="range-value">5</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="submit" id="generate-button" class="primary-button">
+                            <i class="fas fa-magic"></i> Generate Music
+                        </button>
+                    </div>
+                </form>
+                
+                <div id="result-container" class="hidden">
+                    <h3>Generated Music</h3>
+                    <div class="result-info">
+                        <div id="music-details">Music details will appear here</div>
+                    </div>
+                    
+                    <div class="audio-player">
+                        <audio id="audio-player" controls></audio>
+                    </div>
+                    
+                    <div class="download-section">
+                        <a id="download-link" class="download-button">
+                            <i class="fas fa-download"></i> Download Audio
+                        </a>
+                    </div>
+                </div>
+                
+                <div id="loading-indicator" class="hidden">
+                    <div class="spinner"></div>
+                    <p>Generating music with AI...</p>
+                    <p class="small-text">(This may take 15-30 seconds)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simple JavaScript for form submission and MIDI download -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // UI Elements
+            const generationForm = document.getElementById('generation-form');
+            const generateButton = document.getElementById('generate-button');
+            const tempoSlider = document.getElementById('tempo');
+            const tempoValue = tempoSlider.nextElementSibling;
+            const complexitySlider = document.getElementById('complexity');
+            const complexityValue = complexitySlider.nextElementSibling;
+            const statusMessage = document.getElementById('status-message');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const resultContainer = document.getElementById('result-container');
+            const musicDetails = document.getElementById('music-details');
+            const downloadLink = document.getElementById('download-link');
+            const audioPlayer = document.getElementById('audio-player');
+            
+            // Update range slider values
+            tempoSlider.addEventListener('input', function() {
+                tempoValue.textContent = `${this.value} BPM`;
+            });
+            
+            complexitySlider.addEventListener('input', function() {
+                complexityValue.textContent = this.value;
+            });
+            
+            // Handle form submission
+            generationForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                generateMusic();
+            });
+            
+            // Music generation function
+            async function generateMusic() {
+                // Gather form data
+                const prompt = document.getElementById('prompt').value;
+                const genre = document.getElementById('genre').value;
+                const key = document.getElementById('key').value;
+                const tempo = tempoSlider.value;
+                const complexity = complexitySlider.value;
+                
+                // Show loading state
+                loadingIndicator.classList.remove('hidden');
+                resultContainer.classList.add('hidden');
+                generateButton.disabled = true;
+                
+                // Create form data for submission
+                const formData = new FormData();
+                formData.append('prompt', prompt);
+                formData.append('genre', genre);
+                formData.append('key', key);
+                formData.append('tempo', tempo);
+                formData.append('complexity', complexity);
+                
+                try {
+                    const response = await fetch('/generate', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        // Hide loading indicator
+                        loadingIndicator.classList.add('hidden');
+                        resultContainer.classList.remove('hidden');
+                        
+                        // Update music details
+                        musicDetails.textContent = `${capitalizeFirstLetter(genre)} in ${key} at ${tempo} BPM`;
+                        
+                        // Set audio player source
+                        audioPlayer.src = data.audio_file;
+                        audioPlayer.load(); // Force reload of the audio element with new source
+                        
+                        // Update download link - extract filename from path correctly
+                        const filename = data.audio_file.split('/').pop();
+                        downloadLink.href = `/download/${filename}`;
+                        downloadLink.setAttribute('download', filename); // Ensure download attribute is set
+                        // Prevent auto-click behavior that might trigger downloads
+                        downloadLink.addEventListener('click', function(e) {
+                            e.stopPropagation(); // Prevent event bubbling
+                        });
+
+                        // Ensure audio player doesn't auto-download
+                        audioPlayer.onloadedmetadata = function() {
+                            // Audio metadata loaded, ready to play when user clicks
+                            console.log("Audio ready for playback");
+                        };
+                        
+                        // Show success message
+                        showStatus('success', data.message);
+                    } else {
+                        // Handle error
+                        loadingIndicator.classList.add('hidden');
+                        showStatus('error', data.message || 'Failed to generate music. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Error generating music:', error);
+                    loadingIndicator.classList.add('hidden');
+                    showStatus('error', 'An unexpected error occurred. Please try again.');
+                }
+                
+                // Re-enable generate button
+                generateButton.disabled = false;
+            }
+            
+            // Helper functions
+            function showStatus(type, message) {
+                statusMessage.textContent = message;
+                statusMessage.className = ''; // Remove all classes
+                statusMessage.classList.add(type);
+                statusMessage.classList.remove('hidden');
+                
+                // Hide success messages after 5 seconds, but keep error messages visible until user acts
+                if (type === 'success') {
+                    setTimeout(() => {
+                        statusMessage.classList.add('hidden');
+                    }, 5000);
+                } else if (type === 'error') {
+                    // Scroll to the status message for errors
+                    statusMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Add extra guidance for network-related errors
+                    let displayMessage = message;
+                    if (message.includes("Network error") || message.includes("connection issues")) {
+                        displayMessage = `${message}<br><br>
+                        <strong>Suggested actions:</strong><br>
+                        1. Check your internet connection<br>
+                        2. Wait a few minutes and try again<br>
+                        3. Consider using a smaller model or offline alternative`;
+                    }
+                    
+                    // Add a close button for error messages
+                    const closeButton = document.createElement('button');
+                    closeButton.innerHTML = '&times;';
+                    closeButton.className = 'close-button';
+                    closeButton.style.marginLeft = '10px';
+                    closeButton.style.padding = '0 5px';
+                    closeButton.style.backgroundColor = '#f8d7da';
+                    closeButton.style.border = '1px solid #f5c6cb';
+                    closeButton.style.borderRadius = '3px';
+                    closeButton.style.cursor = 'pointer';
+                    closeButton.onclick = function() {
+                        statusMessage.classList.add('hidden');
+                    };
+                    
+                    // Clear existing content and add the message with close button
+                    statusMessage.innerHTML = '';
+                    const messageSpan = document.createElement('span');
+                    messageSpan.innerHTML = displayMessage;
+                    statusMessage.appendChild(messageSpan);
+                    statusMessage.appendChild(closeButton);
+                }
+            }
+            
+            function capitalizeFirstLetter(string) {
+                return string.charAt(0).toUpperCase() + string.slice(1);
+            }
+        });
+    </script>
+</body>
+</html> 
